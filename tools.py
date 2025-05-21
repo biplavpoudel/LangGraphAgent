@@ -94,6 +94,7 @@ def wiki_search(keyword: str) -> str:
     Args:
         keyword: String to lookup in Wikipedia
     """
+    return wiki_search(keyword)
 
 
 
