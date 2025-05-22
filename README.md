@@ -1,3 +1,4 @@
+[![Sync to HuggingFace Hub](https://github.com/biplavpoudel/LangGraphAgent/actions/workflows/main.yml/badge.svg)](https://github.com/biplavpoudel/LangGraphAgent/actions/workflows/main.yml)
 ---
 title: Template Final Assignment
 emoji: 🕵🏻‍♂️
