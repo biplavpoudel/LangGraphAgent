@@ -12,10 +12,14 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Add remote
+      - name: Configure Hugging Face remote
         env:
           HF: ${{ secrets.HF }}
-        run: git remote add space https://steinkelsson:$HF@huggingface.co/spaces/steinkelsson/FinalAssignment
+        run: |
+          git remote | grep -q space && \
+            git remote set-url space https://steinkelsson:$HF@huggingface.co/spaces/steinkelsson/FinalAssignment || \
+            git remote add space https://steinkelsson:$HF@huggingface.co/spaces/steinkelsson/FinalAssignment
+
       - name: Push to Hub
         env:
           HF: ${{ secrets.HF }}
