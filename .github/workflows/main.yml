@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 jobs:
   sync-to-hub:
-    runs-on: [self-hosted, linux]
+    runs-on: [self-hosted, linux, legion]
     steps:
       - uses: actions/checkout@v2
         with:
