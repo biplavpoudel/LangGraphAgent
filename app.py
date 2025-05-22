@@ -3,6 +3,11 @@ import gradio as gr
 import requests
 import inspect
 import pandas as pd
+from builderGraph import build_graph
+from langchain_core.messages import HumanMessage
+
+from dotenv import load_dotenv
+load_dotenv()
 
 # (Keep Constants as is)
 # --- Constants ---
@@ -15,9 +20,12 @@ class BasicAgent:
 
     def __init__(self):
         print("BasicAgent initialized.")
+        self.graph = build_graph()
 
     def __call__(self, question: str) -> str:
         print(f"Agent received question (first 50 chars): {question[:50]}...")
+        messages = [HumanMessage(question)]
+
         fixed_answer = "This is a default answer."
         print(f"Agent returning fixed answer: {fixed_answer}")
         return fixed_answer

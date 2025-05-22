@@ -3,9 +3,8 @@ from langchain_community.docstore import Wikipedia
 from langchain_core.tools import tool
 from langchain_tavily import TavilySearch
 from duckduckgo_search import DDGS
-
+from langchain_community.document_loaders import WikipediaLoader, ArxivLoader
 # from langchain_community.utilities import SearxSearchWrapper
-from langchain_community.document_loaders import WikipediaLoader
 
 from dotenv import load_dotenv
 
@@ -24,7 +23,7 @@ def add(a: int, b: int) -> int:
 
 
 @tool("subtract_tool", parse_docstring=True)
-def add(a: int, b: int) -> int:
+def subtract(a: int, b: int) -> int:
     """Subtract a number from another.
 
     Args:
@@ -76,25 +75,30 @@ def web_search(query: str) -> str:
     """
     try:
         results = DDGS().text(keywords=query, max_results=2)
-        formatted_result = f"\n\n{'-' * 50}\n\n".join([
-            f"<Document Source = '{page['href']}', Title = '{page['title']}'>\n {page['body']}"
-            for page in results])
+        formatted_result = f"\n\n{'-' * 50}\n\n".join(
+            [
+                f"<Document Source = '{page['href']}', Title = '{page['title']}'>\n {page['body']}"
+                for page in results
+            ]
+        )
         return formatted_result
     except DuckDuckGoSearchException as e:
-        print(f"Exception occur with DuckDuckGo! {str(e)}. \n Trying another search engine ")
-
+        print(
+            f"Exception occur with DuckDuckGo! {str(e)}. \n Trying another search engine "
+        )
 
     try:
-        search_tool = TavilySearch(
-            max_results=2,
-            topic="general")
+        search_tool = TavilySearch(max_results=2, topic="general")
         result = search_tool.invoke(f'"query":"{query}"')["results"]
-        formatted_result = f"\n\n{'-' * 50}\n\n".join([
-            f"<Document Source = '{page['url']}', Title = '{page['title']}'>\n {page['content']}"
-            for page in result])
+        formatted_result = f"\n\n{'-' * 50}\n\n".join(
+            [
+                f"<Document Source = '{page['url']}', Title = '{page['title']}'>\n {page['content']}"
+                for page in result
+            ]
+        )
         return formatted_result
 
-    except Exception as  e:
+    except Exception as e:
         print(f"Exception occur with Tavily! {str(e)}. \n Returning empty json")
         return ""
 
@@ -116,7 +120,25 @@ def wiki_search(name: str) -> str:
     return str(formatted_result)
 
 
+@tool("arxiv_search", parse_docstring=False)
+def arxiv_search(name: str) -> str:
+    """Search the paper in arXiv.org
+    Args:
+        name : Name of paper to lookup in arXiv.org"""
+    arxiv_result = ArxivLoader(
+        query=name, load_max_docs=2, load_all_available_meta=True
+    ).load()
+    formatted_result = f"\n\n{'-' * 50}\n\n".join(
+        [
+            f"<Document Title={doc.metadata['Title']}, Published={doc.metadata['Published']}, Authors={doc.metadata['Authors']}'>\n{doc.page_content[:5000]}"
+            for doc in arxiv_result
+        ]
+    )
+    return str(formatted_result)
+
+
 if __name__ == "__main__":
-    keyword = "Martin Luther King"
+    keyword = "Attention is all you need"
     # print(wiki_search.invoke(keyword))
-    print(web_search.invoke(keyword))
+    # print(web_search.invoke(keyword))
+    print(arxiv_search.invoke(keyword))

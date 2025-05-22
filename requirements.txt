@@ -8,3 +8,7 @@ langgraph~=0.4.5
 duckduckgo-search==6.3.5
 langchain-community~=0.3.24
 langchain~=0.3.25
+duckduckgo_search~=6.3.5
+langchain-google-genai~=2.1.4
+duckduckgo_search~=6.3.5
+qdrant-client~=1.14.2
