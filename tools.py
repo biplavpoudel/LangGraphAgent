@@ -1,3 +1,8 @@
+import csv
+import requests
+import os
+import pytesseract
+from PIL import Image
 from duckduckgo_search.exceptions import DuckDuckGoSearchException
 from langchain_core.tools import tool
 from langchain_tavily import TavilySearch
@@ -5,9 +10,6 @@ from duckduckgo_search import DDGS
 from langchain_community.document_loaders import WikipediaLoader, ArxivLoader
 from langchain_community.document_loaders import UnstructuredExcelLoader
 from langchain_community.document_loaders import PyPDFLoader
-import csv
-import requests
-import os
 # from langchain_community.utilities import SearxSearchWrapper
 
 from dotenv import load_dotenv
@@ -75,7 +77,7 @@ def web_search(query: str) -> str:
     """Search the keyword in Search Engine.
 
     Args:
-        query: String to search for
+        query (str): String to search for
     """
     try:
         results = DDGS().text(keywords=query, max_results=2)
@@ -110,8 +112,9 @@ def web_search(query: str) -> str:
 @tool("wiki_search", parse_docstring=False)
 def wiki_search(name: str) -> str:
     """Search the keyword in Wikipedia.
+
     Args:
-        name : String to lookup in Wikipedia."""
+        name (str): String to lookup in Wikipedia."""
     wikipedia_result = WikipediaLoader(
         query=name, load_max_docs=2, load_all_available_meta=True
     ).load()
@@ -127,8 +130,9 @@ def wiki_search(name: str) -> str:
 @tool("arxiv_search", parse_docstring=False)
 def arxiv_search(name: str) -> str:
     """Search the paper in arXiv.org
+
     Args:
-        name : Name of paper to lookup in arXiv.org"""
+        name (str): Name of paper to lookup in arXiv.org"""
     arxiv_result = ArxivLoader(
         query=name, load_max_docs=2, load_all_available_meta=True
     ).load()
@@ -144,8 +148,10 @@ def arxiv_search(name: str) -> str:
 @tool("file_downloader", parse_docstring=False)
 def file_downloader(url: str) -> str:
     """Downloads file from the input url.
+
     Args:
-        url : URL of the resource to download.
+        url (str): URL of the resource to download.
+
     Returns:
         (str) : The path of the downloaded file.
     """
@@ -195,8 +201,9 @@ def file_downloader(url: str) -> str:
 @tool("excel_loader", parse_docstring=True)
 def excel_loader(path: str) -> str:
     """Returns Excel file as formatted string.
+
     Args:
-        path : Path to Excel file"""
+        path (str): Path to Excel file"""
     loader = UnstructuredExcelLoader(file_path=path, mode="elements")
     docs = loader.load()
     formatted_result = f"\n\n{'-' * 50}\n\n".join(
@@ -211,8 +218,9 @@ def excel_loader(path: str) -> str:
 @tool("pdf_loader", parse_docstring=True)
 def pdf_loader(path: str) -> str:
     """Returns pdf file as formatted string.
+
     Args:
-        path : Path to pdf file"""
+        path (str): Path to pdf file"""
     loader = PyPDFLoader(file_path=path, mode="single")
     docs = loader.load()
     formatted_result = f"\n\n{'-' * 50}\n\n".join(
@@ -227,8 +235,9 @@ def pdf_loader(path: str) -> str:
 @tool("csv_loader", parse_docstring=True)
 def csv_loader(path: str) -> str:
     """Returns pdf file as formatted string.
+
     Args:
-        path : Path to csv file"""
+        path (str): Path to csv file"""
     docs = []
     formatted_result = ""
     with open(path, newline="", encoding="str") as csvfile:
@@ -241,6 +250,16 @@ def csv_loader(path: str) -> str:
             docs.append([",".join(row)])
     formatted_result = formatted_result + ",".join([f"{page}" for page in docs])
     return str(formatted_result)
+
+@tool("image_text_extractor", parse_docstring=True)
+def image_text_extractor(path: str) -> str:
+    """Returns text from image file using OCR library pytesseract (if available).
+
+    Args:
+        path (str): Path to image file"""
+    result = pytesseract.image_to_string(Image.open(path), output_type="string")
+    print(f"Text from image '{path.split('/')[-1]}' is :\n{result}")
+    return result
 
 
 if __name__ == "__main__":

@@ -3,7 +3,8 @@ from langchain_core.vectorstores import InMemoryVectorStore
 from langgraph.graph import StateGraph, START
 from langchain_core.messages import HumanMessage, AnyMessage, SystemMessage
 from langchain_huggingface import HuggingFaceEndpoint
-from tools import add, modulo, divide, multiply, subtract, arxiv_search, web_search, wiki_search, file_downloader, excel_loader, csv_loader, pdf_loader
+from tools import add, modulo, divide, multiply, subtract, arxiv_search, web_search, wiki_search, file_downloader, \
+    excel_loader, csv_loader, pdf_loader, image_text_extractor
 from langchain_huggingface import HuggingFaceEmbeddings
 # from langchain_qdrant import QdrantVectorStore
 # from qdrant_client import QdrantClient
@@ -84,6 +85,7 @@ def build_graph(llm_provider: str = "gemma"):
         excel_loader_logged,
         pdf_loader_logged,
         csv_loader_logged,
+        image_text_extractor
     ]
 
     llm_with_tools = llm.bind_tools(logged_tools)

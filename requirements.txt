@@ -14,3 +14,7 @@ duckduckgo_search~=6.3.5
 qdrant-client~=1.14.2
 duckduckgo_search~=6.3.5
 pillow~=11.2.1
+duckduckgo_search~=6.3.5
+duckduckgo_search~=6.3.5
+pytesseract~=0.3.13
+matplotlib~=3.10.3
