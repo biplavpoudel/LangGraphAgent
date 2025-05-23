@@ -4,7 +4,9 @@ from datetime import datetime
 from functools import wraps
 from typing import Any, Dict
 
+
 class ToolLogger:
+
     def __init__(self, vectorstore):
         self.vectorstore = vectorstore
 
@@ -21,7 +23,6 @@ class ToolLogger:
             sum = add.invoke({"a": 1, "b": 2})
         """
 
-
         @wraps(tool_fn)
         def wrapped_tool(input_kwargs: Dict[str, Any]):
             input_repr = f"input: {input_kwargs}"
@@ -37,8 +38,8 @@ class ToolLogger:
                     page_content=f"TOOL: {name}\nINPUT: {input_repr}\nOUTPUT: {result}",
                     metadata={
                         "tool_name": name,
-                        "timestamp": datetime.now().isoformat()
-                    }
+                        "timestamp": datetime.now().isoformat(),
+                    },
                 )
             self.vectorstore.add_documents([doc])
             return result

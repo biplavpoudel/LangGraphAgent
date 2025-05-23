@@ -1,16 +1,15 @@
-import os
-from typing import TypedDict, List, Dict, Any, Optional, Annotated
+from typing import TypedDict, List
 from langchain_core.vectorstores import InMemoryVectorStore
-from langgraph.graph import StateGraph, START, END
-from langchain_core.messages import HumanMessage, AIMessage, AnyMessage, SystemMessage
-from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
-from tools import add, modulo, divide, multiply, subtract, arxiv_search, web_search, wiki_search
+from langgraph.graph import StateGraph, START
+from langchain_core.messages import HumanMessage, AnyMessage, SystemMessage
+from langchain_huggingface import HuggingFaceEndpoint
+from tools import add, modulo, divide, multiply, subtract, arxiv_search, web_search, wiki_search, file_downloader, excel_loader, csv_loader, pdf_loader
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_qdrant import QdrantVectorStore
-from qdrant_client import QdrantClient
-from qdrant_client.http.models import Distance, VectorParams
+# from langchain_qdrant import QdrantVectorStore
+# from qdrant_client import QdrantClient
+# from qdrant_client.http.models import Distance, VectorParams
 from langgraph.prebuilt import ToolNode, tools_condition
-from langchain_core.documents import Document
+# from langchain_core.documents import Document
 from tool_logger import ToolLogger
 
 from langchain_ollama import ChatOllama
@@ -19,30 +18,31 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 class State(TypedDict):
     messages: List[AnyMessage]
 
-def build_graph(llm_provider: str = 'gemma'):
+def build_graph(llm_provider: str = "gemma"):
     # Adding LLM/VLM Model
     if llm_provider == "huggingface":
-        llm = HuggingFaceEndpoint(repo_id='mistralai/Mistral-7B-Instruct-v0.3',
-                                  model='mistralai/Mistral-7B-Instruct-v0.3',
-                                  # huggingfacehub_api_token=os.getenv('HUGGINGFACE_API'),
-                                  verbose=True,
-                                  )
+        llm = HuggingFaceEndpoint(
+            repo_id="mistralai/Mistral-7B-Instruct-v0.3",
+            model="mistralai/Mistral-7B-Instruct-v0.3",
+            # huggingfacehub_api_token=os.getenv('HUGGINGFACE_API'),
+            verbose=True,
+        )
     elif llm_provider == "gemma":
         llm = ChatGoogleGenerativeAI(model="gemini/gemini-2.0-flash-lite-001")
     elif llm_provider == "ollama":
-        llm = ChatOllama(
-            model="mistral:7b",
-            temperature=0)
+        llm = ChatOllama(model="mistral:7b", temperature=0)
     else:
         raise ValueError(f"Unknown LLM provider: {llm_provider}")
 
     # Let's add system prompt from system_prompt.txt
-    with open("system_prompt.txt") as f:
+    with open("system_prompt.txt", encoding="str") as f:
         sys_message = f.read()
     system_prompt = SystemMessage.from_text(sys_message)
 
     # Adding Embedding Model
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-mpnet-base-v2"
+    )
 
     # Adding Vector Store
     vector_store = InMemoryVectorStore(embeddings)
@@ -65,11 +65,26 @@ def build_graph(llm_provider: str = 'gemma'):
     web_search_logged = logger.wrap(web_search)
     wiki_search_logged = logger.wrap(wiki_search)
     arxiv_search_logged = logger.wrap(arxiv_search)
-
+    excel_loader_logged = logger.wrap(excel_loader)
+    pdf_loader_logged = logger.wrap(pdf_loader)
+    csv_loader_logged = logger.wrap(csv_loader)
 
     # List of Tools that are bound to the LLM
     # tools = [add, subtract, multiply, divide, modulo, arxiv_search, web_search, wiki_search]
-    logged_tools = [add, subtract, multiply, divide, modulo, arxiv_search_logged, web_search_logged, wiki_search_logged]
+    logged_tools = [
+        add,
+        subtract,
+        multiply,
+        divide,
+        modulo,
+        arxiv_search_logged,
+        web_search_logged,
+        wiki_search_logged,
+        file_downloader,
+        excel_loader_logged,
+        pdf_loader_logged,
+        csv_loader_logged,
+    ]
 
     llm_with_tools = llm.bind_tools(logged_tools)
 
@@ -83,15 +98,22 @@ def build_graph(llm_provider: str = 'gemma'):
         }
 
     def retrieve_documents(state: State):
-        latest_user_msg = [msg.content for msg in state["messages"] if isinstance(msg, HumanMessage)][-1]
+        latest_user_msg = [
+            msg.content for msg in state["messages"] if isinstance(msg, HumanMessage)
+        ][-1]
         retrieved_docs = retriever.retrieve(latest_user_msg)
         return {
-            "message": state["messages"] + [SystemMessage(content="\n\n".join([doc.content for doc in retrieved_docs]))]
+            "message": state["messages"]
+            + [
+                SystemMessage(
+                    content="\n\n".join([doc.content for doc in retrieved_docs])
+                )
+            ]
         }
 
     # Add Nodes to Graph
     graph_builder.add_node("assistant", assistant)
-    graph_builder.add_node("tools", ToolNode(tools))
+    graph_builder.add_node("tools", ToolNode(logged_tools))
     graph_builder.add_node("document_retriever", retrieve_documents)
 
     # Add Edges to Graph

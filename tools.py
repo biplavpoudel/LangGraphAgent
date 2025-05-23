@@ -1,5 +1,4 @@
 from duckduckgo_search.exceptions import DuckDuckGoSearchException
-from langchain_community.docstore import Wikipedia
 from langchain_core.tools import tool
 from langchain_tavily import TavilySearch
 from duckduckgo_search import DDGS
@@ -141,6 +140,7 @@ def arxiv_search(name: str) -> str:
     )
     return str(formatted_result)
 
+
 @tool("file_downloader", parse_docstring=False)
 def file_downloader(url: str) -> str:
     """Downloads file from the input url.
@@ -148,16 +148,48 @@ def file_downloader(url: str) -> str:
         url : URL of the resource to download.
     Returns:
         (str) : The path of the downloaded file.
-        """
-    filename = url.split('/')[-1]
-    download_dir = os.getcwd()+ "/downloads/"
+    """
+    filename = url.split("/")[-1]
+    download_dir = os.getcwd() + "/downloads/"
     file_path = os.path.join(download_dir, filename)
-    with requests.get(url, stream=True) as r:
-        r.raise_for_status()
-        with open(file_path, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                f.write(chunk)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36"
+    }
+    print(f"Attempting to download from: {url}")
+    print(f"Saving to: {file_path}")
+    try:
+        with requests.get(url, stream=True, headers=headers, timeout=5) as r:
+            r.raise_for_status()
+            expected_size = r.headers.get("content-length")
+            if expected_size:
+                expected_size = int(expected_size)
+                print(f"Expected file size: {expected_size} bytes.")
+            else:
+                print("Content-Length header not found.")
+            downloaded_size = 0
+            with open(file_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:  # to remove keep-alive chunks
+                        f.write(chunk)
+                        downloaded_size += len(chunk)
+            if expected_size and downloaded_size != expected_size:
+                print(
+                    f"WARNING: Downloaded size ({downloaded_size}) does not match expected size ({expected_size}). File might be incomplete."
+                )
+
+            print(f"File saved at: {file_path}")
+    except requests.exceptions.RequestException as e:
+        print(f"Error during download (HTTP or network issue): {e}")
+        if os.path.exists(file_path):
+            os.remove(file_path)  # Clean up partial download
+        return ""
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        if os.path.exists(file_path):
+            os.remove(file_path)  # Clean up partial download
+        return ""
     return file_path
+
 
 @tool("excel_loader", parse_docstring=True)
 def excel_loader(path: str) -> str:
@@ -174,6 +206,7 @@ def excel_loader(path: str) -> str:
     )
     return str(formatted_result)
 
+
 @tool("pdf_loader", parse_docstring=True)
 def pdf_loader(path: str) -> str:
     """Returns pdf file as formatted string.
@@ -189,27 +222,25 @@ def pdf_loader(path: str) -> str:
     )
     return str(formatted_result)
 
+
 @tool("csv_loader", parse_docstring=True)
 def csv_loader(path: str) -> str:
     """Returns pdf file as formatted string.
     Args:
         path : Path to csv file"""
     docs = []
-    with open(path, newline='') as csvfile:
-        reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+    formatted_result = ""
+    with open(path, newline="", encoding="str") as csvfile:
+        reader = csv.reader(csvfile, delimiter=" ", quotechar="|")
         header = next(reader, None)
         if header:
             # print(f"Header: {header}")
             formatted_result = f"<Document source={path}>, Header={header}, Content=<"
         for row in reader:
-            docs.append([','.join(row)])
-    formatted_result = formatted_result + ",".join(
-        [
-            f"{page}"
-            for page in docs
-        ]
-    )
+            docs.append([",".join(row)])
+    formatted_result = formatted_result + ",".join([f"{page}" for page in docs])
     return str(formatted_result)
+
 
 if __name__ == "__main__":
     keyword = "Attention is all you need"

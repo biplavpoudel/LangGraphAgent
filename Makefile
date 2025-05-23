@@ -3,7 +3,7 @@ install:
 		pip install -r requirements.txt
 
 lint:
-	pylint --disable=R,C,W1203 *.py
+	pylint --disable=R,C,W *.py
 
 format:
 	pyink *.py
