@@ -4,6 +4,11 @@ from langchain_core.tools import tool
 from langchain_tavily import TavilySearch
 from duckduckgo_search import DDGS
 from langchain_community.document_loaders import WikipediaLoader, ArxivLoader
+from langchain_community.document_loaders import UnstructuredExcelLoader
+from langchain_community.document_loaders import PyPDFLoader
+import csv
+import requests
+import os
 # from langchain_community.utilities import SearxSearchWrapper
 
 from dotenv import load_dotenv
@@ -136,6 +141,75 @@ def arxiv_search(name: str) -> str:
     )
     return str(formatted_result)
 
+@tool("file_downloader", parse_docstring=False)
+def file_downloader(url: str) -> str:
+    """Downloads file from the input url.
+    Args:
+        url : URL of the resource to download.
+    Returns:
+        (str) : The path of the downloaded file.
+        """
+    filename = url.split('/')[-1]
+    download_dir = os.getcwd()+ "/downloads/"
+    file_path = os.path.join(download_dir, filename)
+    with requests.get(url, stream=True) as r:
+        r.raise_for_status()
+        with open(file_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+    return file_path
+
+@tool("excel_loader", parse_docstring=True)
+def excel_loader(path: str) -> str:
+    """Returns Excel file as formatted string.
+    Args:
+        path : Path to Excel file"""
+    loader = UnstructuredExcelLoader(file_path=path, mode="elements")
+    docs = loader.load()
+    formatted_result = f"\n\n{'-' * 50}\n\n".join(
+        [
+            f"<Document Title={page.metadata['page_name']}, Page={page.metadata['page_number']}'>\n{page.metadata['text_as_html'] if page.metadata['category'] == 'Table' else {page.page_content}}"
+            for page in docs
+        ]
+    )
+    return str(formatted_result)
+
+@tool("pdf_loader", parse_docstring=True)
+def pdf_loader(path: str) -> str:
+    """Returns pdf file as formatted string.
+    Args:
+        path : Path to pdf file"""
+    loader = PyPDFLoader(file_path=path, mode="single")
+    docs = loader.load()
+    formatted_result = f"\n\n{'-' * 50}\n\n".join(
+        [
+            f"<Document Source={page.metadata['source']}, Title={page.metadata['title']}, Authors={page.metadata['author']}'>\n{page.page_content[:1000]}"
+            for page in docs
+        ]
+    )
+    return str(formatted_result)
+
+@tool("csv_loader", parse_docstring=True)
+def csv_loader(path: str) -> str:
+    """Returns pdf file as formatted string.
+    Args:
+        path : Path to csv file"""
+    docs = []
+    with open(path, newline='') as csvfile:
+        reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+        header = next(reader, None)
+        if header:
+            # print(f"Header: {header}")
+            formatted_result = f"<Document source={path}>, Header={header}, Content=<"
+        for row in reader:
+            docs.append([','.join(row)])
+    formatted_result = formatted_result + ",".join(
+        [
+            f"{page}"
+            for page in docs
+        ]
+    )
+    return str(formatted_result)
 
 if __name__ == "__main__":
     keyword = "Attention is all you need"
