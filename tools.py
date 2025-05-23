@@ -151,6 +151,7 @@ def file_downloader(url: str) -> str:
     """
     filename = url.split("/")[-1]
     download_dir = os.getcwd() + "/downloads/"
+    os.makedirs(download_dir, exist_ok=True)
     file_path = os.path.join(download_dir, filename)
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36"
