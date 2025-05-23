@@ -1,5 +1,6 @@
 import os
 from typing import TypedDict, List, Dict, Any, Optional, Annotated
+from langchain_core.vectorstores import InMemoryVectorStore
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage, AIMessage, AnyMessage, SystemMessage
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
@@ -44,18 +45,18 @@ def build_graph(llm_provider: str = 'gemma'):
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
 
     # Adding Vector Store
-    # vector_store = InMemoryVectorStore(embeddings)
-    client = QdrantClient(url="https://e75c4d7b-d8c8-4f7b-9e54-892bc1583cb9.europe-west3-0.gcp.cloud.qdrant.io:6333",
-                          api_key=os.environ["QDRANT_API_KEY"])
-    client.create_collection(
-        collection_name="langchain_assistant",
-        vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
-    )
-    vector_store = QdrantVectorStore(
-        client=client,
-        collection_name="langchain_assistant",
-        embedding=embeddings,
-    )
+    vector_store = InMemoryVectorStore(embeddings)
+    # client = QdrantClient(url="https://e75c4d7b-d8c8-4f7b-9e54-892bc1583cb9.europe-west3-0.gcp.cloud.qdrant.io:6333",
+    #                       api_key=os.environ["QDRANT_API_KEY"])
+    # client.create_collection(
+    #     collection_name="langchain_assistant",
+    #     vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
+    # )
+    # vector_store = QdrantVectorStore(
+    #     client=client,
+    #     collection_name="langchain_assistant",
+    #     embedding=embeddings,
+    # )
 
     # Initialize Logger
     logger = ToolLogger(vector_store)
