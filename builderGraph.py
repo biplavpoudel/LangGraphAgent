@@ -10,6 +10,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams
 from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_core.documents import Document
+from tool_logger import ToolLogger
 
 from langchain_ollama import ChatOllama
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -39,11 +40,6 @@ def build_graph(llm_provider: str = 'gemma'):
         sys_message = f.read()
     system_prompt = SystemMessage.from_text(sys_message)
 
-    # List of Tools that are bound to the LLM
-    tools = [add, subtract, multiply, divide, modulo, arxiv_search, web_search, wiki_search]
-
-    llm_with_tools = llm.bind_tools(tools)
-
     # Adding Embedding Model
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
 
@@ -60,6 +56,21 @@ def build_graph(llm_provider: str = 'gemma'):
         collection_name="langchain_assistant",
         embedding=embeddings,
     )
+
+    # Initialize Logger
+    logger = ToolLogger(vector_store)
+
+    # wrapping tools with logger so the result from tools are stored in vectordb
+    web_search_logged = logger.wrap(web_search)
+    wiki_search_logged = logger.wrap(wiki_search)
+    arxiv_search_logged = logger.wrap(arxiv_search)
+
+
+    # List of Tools that are bound to the LLM
+    # tools = [add, subtract, multiply, divide, modulo, arxiv_search, web_search, wiki_search]
+    logged_tools = [add, subtract, multiply, divide, modulo, arxiv_search_logged, web_search_logged, wiki_search_logged]
+
+    llm_with_tools = llm.bind_tools(logged_tools)
 
     graph_builder = StateGraph()
     retriever = vector_store.as_retriever()
