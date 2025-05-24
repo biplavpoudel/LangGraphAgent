@@ -15,7 +15,11 @@ jobs:
           lfs: true
       - name: Install Git LFS (if not already present or for good measure)
         run: |
-          git lfs install
+          if ! command -v git-lfs &> /dev/null; then
+            curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
+            sudo apt-get install -y git-lfs
+            git lfs install
+          fi
       - name: Configure Hugging Face remote
         env:
           HF: ${{ secrets.HF }}
