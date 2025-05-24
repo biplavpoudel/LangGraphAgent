@@ -9,6 +9,13 @@ jobs:
   sync-to-hub:
     runs-on: [self-hosted, linux, legion]
     steps:
+      - name: Install Git LFS (if not already present or for good measure)
+        run: |
+          if ! command -v git-lfs &> /dev/null; then
+            curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
+            sudo apt-get install -y git-lfs
+            git lfs install
+          fi
       - uses: actions/checkout@v4
         with:
             fetch-depth: 0
@@ -25,4 +32,5 @@ jobs:
         env:
           HF: ${{ secrets.HF }}
         run: |
-          git push --force https://steinkelsson:$HF@huggingface.co/spaces/steinkelsson/FinalAssignment main
+          git lfs push --all space main
+          git push --force space main
