@@ -16,7 +16,7 @@ jobs:
             sudo apt-get install -y git-lfs
             git lfs install
           fi
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
             fetch-depth: 0
             lfs: true
@@ -28,7 +28,9 @@ jobs:
             git remote set-url space https://steinkelsson:$HF@huggingface.co/spaces/steinkelsson/FinalAssignment || \
             git remote add space https://steinkelsson:$HF@huggingface.co/spaces/steinkelsson/FinalAssignment
 
-      - name: Push to Hub
+      - name: Push to Hub with LFS
         env:
           HF: ${{ secrets.HF }}
-        run: git push --force https://steinkelsson:$HF@huggingface.co/spaces/steinkelsson/FinalAssignment main
+        run: |
+          git lfs push --all origin
+          git push --force https://steinkelsson:$HF@huggingface.co/spaces/steinkelsson/FinalAssignment main
