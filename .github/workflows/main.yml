@@ -9,9 +9,6 @@ jobs:
   sync-to-hub:
     runs-on: [self-hosted, linux, legion]
     steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
       - name: Install Git LFS (if not already present or for good measure)
         run: |
           if ! command -v git-lfs &> /dev/null; then
@@ -19,6 +16,10 @@ jobs:
             sudo apt-get install -y git-lfs
             git lfs install
           fi
+      - uses: actions/checkout@v2
+        with:
+            fetch-depth: 0
+            lfs: true
       - name: Configure Hugging Face remote
         env:
           HF: ${{ secrets.HF }}
