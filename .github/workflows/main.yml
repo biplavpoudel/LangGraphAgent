@@ -1,0 +1,36 @@
+name: Sync to HuggingFace Hub
+on:
+  push:
+    branches: [main]
+
+  # to run this manually from the Actions tab
+  workflow_dispatch:
+jobs:
+  sync-to-hub:
+    runs-on: [self-hosted, linux, legion]
+    steps:
+      - name: Install Git LFS (if not already present or for good measure)
+        run: |
+          if ! command -v git-lfs &> /dev/null; then
+            curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
+            sudo apt-get install -y git-lfs
+            git lfs install
+          fi
+      - uses: actions/checkout@v4
+        with:
+            fetch-depth: 0
+            lfs: true
+      - name: Configure Hugging Face remote
+        env:
+          HF: ${{ secrets.HF }}
+        run: |
+          git remote | grep -q space && \
+            git remote set-url space https://steinkelsson:$HF@huggingface.co/spaces/steinkelsson/LangGraphAgent || \
+            git remote add space https://steinkelsson:$HF@huggingface.co/spaces/steinkelsson/LangGraphAgent
+
+      - name: Push to Hub with LFS
+        env:
+          HF: ${{ secrets.HF }}
+        run: |
+          git lfs push --all space
+          git push --force space main
