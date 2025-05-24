@@ -12,7 +12,6 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          lfs: true
       - name: Install Git LFS (if not already present or for good measure)
         run: |
           if ! command -v git-lfs &> /dev/null; then
