@@ -25,5 +25,4 @@ jobs:
         env:
           HF: ${{ secrets.HF }}
         run: |
-#          git lfs push --all https://steinkelsson:$HF@huggingface.co/spaces/steinkelsson/FinalAssignment
           git push --force https://steinkelsson:$HF@huggingface.co/spaces/steinkelsson/FinalAssignment main
