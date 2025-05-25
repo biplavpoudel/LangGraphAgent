@@ -118,10 +118,9 @@ def build_graph(llm_provider: str = "gemma"):
         latest_user_msg = [
             msg.content for msg in state["messages"] if isinstance(msg, HumanMessage)
         ][-1]
-        retrieved_docs = retriever.retrieve(latest_user_msg)
+        retrieved_docs = retriever.invoke(latest_user_msg)
         return {
-            "message": state["messages"]
-            + [
+            "message": [
                 SystemMessage(
                     content="\n\n".join([doc.content for doc in retrieved_docs])
                 )
@@ -151,10 +150,9 @@ def build_graph(llm_provider: str = "gemma"):
 if __name__ == "__main__":
     question = "When was a picture of St. Thomas Aquinas first added to the Wikipedia page on the Principle of double effect?"
     graph = build_graph(llm_provider="ollama")
-    with open("system_prompt.txt", encoding="utf-8") as f:
-        sys_message = f.read()
-    system_prompt = SystemMessage(content=sys_message)
-    messages = [system_prompt + HumanMessage(content=question)]
-    messages = graph.invoke(messages)
-    for m in messages["messages"]:
-        pprint(m)
+
+    messages = [HumanMessage(content=question)]
+    messages = graph.invoke({"messages": messages})
+    print(messages)
+    # for m in messages["messages"]:
+    #     pprint(m)
