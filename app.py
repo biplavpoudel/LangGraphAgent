@@ -25,11 +25,11 @@ class BasicAgent:
 
     def __call__(self, question: str) -> str:
         print(f"Agent received question (first 50 chars): {question[:50]}...")
-        messages = [HumanMessage(question)]
-
-        fixed_answer = "This is a default answer."
-        print(f"Agent returning fixed answer: {fixed_answer}")
-        return fixed_answer
+        messages = [HumanMessage(content=question)]
+        response = self.graph.invoke({"message": messages})
+        answer = response["messages"][-1].content
+        print(f"Agent is returning response from the graph: {answer}")
+        return answer
 
 
 def run_and_submit_all(profile: gr.OAuthProfile | None):

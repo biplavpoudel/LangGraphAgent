@@ -1,4 +1,5 @@
 # Here I create a class that wraps the invoked tool into a logger and stores the response in vector store
+#ISSUE: the logger doesn't preserve the signature of tools that the LangGraph expects to be!!!
 from langchain_core.documents import Document
 from datetime import datetime
 from functools import wraps
@@ -10,8 +11,8 @@ class ToolLogger:
     def __init__(self, vectorstore):
         self.vectorstore = vectorstore
 
-    def wrap(self, tool_fn, tool_name=None):
-        name = tool_name or tool_fn.__name__
+    def wrap(self, tool_fn):
+        name = tool_fn.name
 
         """
         Tools in Langchain with @tool decorator take input as dictionary/json.

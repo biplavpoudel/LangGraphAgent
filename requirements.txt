@@ -3,7 +3,7 @@ requests~=2.32.3
 pandas~=2.2.3
 pytest~=8.3.5
 python-dotenv~=1.1.0
-langchain-core~=0.3.60
+langchain-core~=0.3.61
 langgraph~=0.4.5
 duckduckgo-search==6.3.5
 langchain-community~=0.3.24
@@ -21,3 +21,4 @@ duckduckgo_search~=6.3.5
 duckduckgo_search~=6.3.5
 pytesseract~=0.3.13
 matplotlib~=3.10.3
+huggingface-hub~=0.31.2

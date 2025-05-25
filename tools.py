@@ -2,6 +2,7 @@ import csv
 import requests
 import os
 import pytesseract
+from typing import Union
 from PIL import Image
 from duckduckgo_search.exceptions import DuckDuckGoSearchException
 from langchain_core.tools import tool
@@ -17,8 +18,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-@tool("add_tool", parse_docstring=True)
-def add(a: int, b: int) -> int:
+@tool("add_tool", parse_docstring=False)
+def add(a: float, b: float) -> float:
     """Add two numbers.
 
     Args:
@@ -28,8 +29,8 @@ def add(a: int, b: int) -> int:
     return a + b
 
 
-@tool("subtract_tool", parse_docstring=True)
-def subtract(a: int, b: int) -> int:
+@tool("subtract_tool", parse_docstring=False)
+def subtract(a: float, b: float) -> float:
     """Subtract a number from another.
 
     Args:
@@ -39,8 +40,8 @@ def subtract(a: int, b: int) -> int:
     return a - b
 
 
-@tool("multiply_tool", parse_docstring=True)
-def multiply(a: int, b: int) -> int:
+@tool("multiply_tool", parse_docstring=False)
+def multiply(a: float, b: float) -> float:
     """Multiply two numbers.
 
     Args:
@@ -50,8 +51,8 @@ def multiply(a: int, b: int) -> int:
     return a * b
 
 
-@tool("division_tool", parse_docstring=True)
-def divide(a: int, b: int) -> float:
+@tool("division_tool", parse_docstring=False)
+def divide(a: float, b: float) -> float:
     """Divide two numbers.
 
     Args:
@@ -61,7 +62,7 @@ def divide(a: int, b: int) -> float:
     return a / b
 
 
-@tool("modulo_tool", parse_docstring=True)
+@tool("modulo_tool", parse_docstring=False)
 def modulo(a: int, b: int) -> int:
     """Reminder of division of two numbers.
 
@@ -70,6 +71,17 @@ def modulo(a: int, b: int) -> int:
         b: Second operand
     """
     return a % b
+
+
+@tool("power_tool", parse_docstring=False)
+def power(a: float, b: float) -> float | complex:
+    """Value of a raised to the power of b (i.e. a^b)
+
+    Args:
+        a: Base number
+        b: Exponent number
+    """
+    return pow(a, b)
 
 
 @tool("web_search", parse_docstring=False)
@@ -240,7 +252,7 @@ def csv_loader(path: str) -> str:
         path (str): Path to csv file"""
     docs = []
     formatted_result = ""
-    with open(path, newline="", encoding="str") as csvfile:
+    with open(path, newline="", encoding="utf-8") as csvfile:
         reader = csv.reader(csvfile, delimiter=" ", quotechar="|")
         header = next(reader, None)
         if header:
@@ -250,6 +262,7 @@ def csv_loader(path: str) -> str:
             docs.append([",".join(row)])
     formatted_result = formatted_result + ",".join([f"{page}" for page in docs])
     return str(formatted_result)
+
 
 @tool("image_text_extractor", parse_docstring=True)
 def image_text_extractor(path: str) -> str:
