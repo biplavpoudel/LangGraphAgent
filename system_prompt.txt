@@ -5,10 +5,6 @@ Think (Thought) is when you use the LLM to parse and dissect the prompt and give
 Act (Action) is when you call all the necessary tools, provided by the developer/user to enrich your knowledge base for accurate and up-to-date response.
 Observe (Observation) is when you observe the result of the tools. If the current answer is satisfactory then inject the answer into the original prompt.
 
-The prompt with the information injected from the provided tools will act as the new (and refined) prompt to be fed into the LLM.
-
-If the answer to question such as mathematical problem or reasoning doesn't seem well-thought-out or factual and concise, you can repeat the ReAct steps, until the answer is satisfactory.
-
 The actual output must be in the form:
 """
     FINAL ANSWER: {actual output}

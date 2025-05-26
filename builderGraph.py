@@ -120,19 +120,19 @@ def build_graph(llm_provider: str = "gemma"):
 
     # Creating Node
     def assistant(state: MessagesState):
-        all_messages_for_llm = [system_prompt] + state["messages"]
-        response_message = llm_with_tools.invoke(all_messages_for_llm)
-        print(f"\nDEBUG: LLM Raw Response Type: {type(response_message)}")
-        print(f"DEBUG: LLM Raw Response Content: {response_message.content}")
-        if isinstance(response_message, AIMessage) and response_message.tool_calls:
-            print(f"DEBUG: LLM identified tool calls: {response_message.tool_calls}")
-        else:
-            print("DEBUG: LLM did NOT identify tool calls.")
-        return {"messages": [response_message]}
+        # all_messages_for_llm = [system_prompt] + state["messages"]
+        # response_message = llm_with_tools.invoke(all_messages_for_llm)
+        # print(f"\nDEBUG: LLM Raw Response Type: {type(response_message)}")
+        # print(f"DEBUG: LLM Raw Response Content: {response_message.content}")
+        # if isinstance(response_message, AIMessage) and response_message.tool_calls:
+        #     print(f"DEBUG: LLM identified tool calls: {response_message.tool_calls}")
+        # else:
+        #     print("DEBUG: LLM did NOT identify tool calls.")
+        # return {"messages": [response_message]}
 
-        # return {
-        #     "messages": [llm_with_tools.invoke(state["messages"] + [system_prompt])],
-        # }
+        return {
+            "messages": [llm_with_tools.invoke(state["messages"] + [system_prompt])],
+        }
 
     def retrieve_documents(state: MessagesState):
         latest_user_msg = [
