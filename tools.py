@@ -2,6 +2,7 @@ import csv
 import requests
 import os
 import pytesseract
+import base64
 from typing import Union
 from PIL import Image
 from duckduckgo_search.exceptions import DuckDuckGoSearchException
@@ -265,12 +266,33 @@ def csv_loader(path: str) -> str:
 
 
 @tool("image_text_extractor", parse_docstring=True)
-def image_text_extractor(path: str) -> str:
+def image_text_extractor(path: str, model: str = pytesseract) -> str:
     """Returns text from image file using OCR library pytesseract (if available).
 
     Args:
-        path (str): Path to image file"""
-    result = pytesseract.image_to_string(Image.open(path), output_type="string")
+        path (str): Path to image file
+        model (Optional): defaults to PyTesseract. For local use with Ollama, Gemma3 can be used
+    """
+    result = ""
+    if model == "pytesseract":
+        result = pytesseract.image_to_string(Image.open(path), output_type="string")
+    elif model == "ollama":
+        with open(path, "rb") as img_file:
+            img_base64 = base64.b64encode(img_file.read()).decode("utf-8")
+
+        # Send to Ollama
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "gemma3:4b-it-q8_0",
+                "options": {"temperature": 1, "top_p": 0.95, "top_k": 64},
+                "prompt": "What is in this image?",
+                "images": [img_base64],
+                "stream": False,
+            },
+        )
+
+        result = response.json()["response"]
     print(f"Text from image '{path.split('/')[-1]}' is :\n{result}")
     return result
 

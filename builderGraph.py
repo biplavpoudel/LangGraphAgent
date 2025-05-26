@@ -1,8 +1,10 @@
 from pprint import pprint
+from typing import Literal
+
 from langchain_core.vectorstores import InMemoryVectorStore
 from langgraph.graph import StateGraph, START, MessagesState
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_huggingface import HuggingFaceEndpoint
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 from tools import add, modulo, divide, multiply, subtract, power, arxiv_search, web_search, wiki_search, file_downloader, excel_loader, csv_loader, pdf_loader, image_text_extractor
 from langchain_huggingface import HuggingFaceEmbeddings
 # from langchain_qdrant import QdrantVectorStore
@@ -22,17 +24,23 @@ load_dotenv()
 def build_graph(llm_provider: str = "gemma"):
     # Adding LLM/VLM Model
     if llm_provider == "huggingface":
-        llm = HuggingFaceEndpoint(
-            repo_id="mistralai/Mistral-7B-Instruct-v0.3",
-            model="mistralai/Mistral-7B-Instruct-v0.3",
-            # huggingfacehub_api_token=os.getenv('HUGGINGFACE_API'),
+        llm = ChatHuggingFace(
+            llm=HuggingFaceEndpoint(
+                repo_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+                model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+                task="text-generation",
+                max_new_tokens=1024,
+                do_sample=False,
+                repetition_penalty=1.03,
+                temperature=0,
+            ),
             verbose=True,
         )
     elif llm_provider == "gemma":
         llm = ChatGoogleGenerativeAI(model="gemini/gemini-2.0-flash-lite-001")
     elif llm_provider == "ollama":
         # httpx.ConnectError when Ollama not running in background
-        llm = ChatOllama(model="mistral:7b", temperature=0)
+        llm = ChatOllama(model="qwen3:4b", temperature=0.1)
     else:
         raise ValueError(f"Unknown LLM provider: {llm_provider}")
 
@@ -86,7 +94,7 @@ def build_graph(llm_provider: str = "gemma"):
         excel_loader,
         pdf_loader,
         csv_loader,
-        image_text_extractor
+        image_text_extractor,
     ]
     logged_tools = [
         add,
@@ -112,9 +120,19 @@ def build_graph(llm_provider: str = "gemma"):
 
     # Creating Node
     def assistant(state: MessagesState):
-        return {
-            "messages": [llm_with_tools.invoke(state["messages"] + [system_prompt])],
-        }
+        all_messages_for_llm = [system_prompt] + state["messages"]
+        response_message = llm_with_tools.invoke(all_messages_for_llm)
+        print(f"\nDEBUG: LLM Raw Response Type: {type(response_message)}")
+        print(f"DEBUG: LLM Raw Response Content: {response_message.content}")
+        if isinstance(response_message, AIMessage) and response_message.tool_calls:
+            print(f"DEBUG: LLM identified tool calls: {response_message.tool_calls}")
+        else:
+            print("DEBUG: LLM did NOT identify tool calls.")
+        return {"messages": [response_message]}
+
+        # return {
+        #     "messages": [llm_with_tools.invoke(state["messages"] + [system_prompt])],
+        # }
 
     def retrieve_documents(state: MessagesState):
         latest_user_msg = [
@@ -150,12 +168,14 @@ def build_graph(llm_provider: str = "gemma"):
 
 
 if __name__ == "__main__":
-    question = "When was a picture of St. Thomas Aquinas first added to the Wikipedia page on the Principle of double effect?"
+    # question = "When was a picture of St. Thomas Aquinas first added to the Wikipedia page on the Principle of double effect?"
+    # question = "Search Wikipedia for 'Python programming language'"
+    question = "What is 200 power 8.99999?"
     graph = build_graph(llm_provider="ollama")
 
     messages = [HumanMessage(content=question)]
     response = graph.invoke({"messages": messages})
     answer = response["messages"][-1].content
-    # print(answer)
-    for m in messages[answer]:
-        pprint(m)
+    print(answer)
+    # for m in response["messages"]:
+    #     pprint(m)
