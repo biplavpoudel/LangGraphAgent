@@ -5,6 +5,8 @@ from langchain_core.vectorstores import InMemoryVectorStore
 from langgraph.graph import StateGraph, START, MessagesState
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
+from sympy.physics.units import temperature
+
 from tools import add, modulo, divide, multiply, subtract, power, arxiv_search, web_search, wiki_search, file_downloader, excel_loader, csv_loader, pdf_loader, image_text_extractor
 from langchain_huggingface import HuggingFaceEmbeddings
 # from langchain_qdrant import QdrantVectorStore
@@ -26,21 +28,18 @@ def build_graph(llm_provider: str = "gemma"):
     if llm_provider == "huggingface":
         llm = ChatHuggingFace(
             llm=HuggingFaceEndpoint(
-                repo_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-                model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-                task="text-generation",
-                max_new_tokens=1024,
-                do_sample=False,
-                repetition_penalty=1.03,
+                endpoint_url="https://api-inference.huggingface.co/models/Meta-DeepLearning/llama-2-7b-chat-hf",
                 temperature=0,
             ),
             verbose=True,
         )
     elif llm_provider == "gemma":
-        llm = ChatGoogleGenerativeAI(model="gemini/gemini-2.0-flash-lite-001")
+        llm = ChatGoogleGenerativeAI(model="gemini/gemini-2.0-flash-lite-001", temperature=0.1)
+        # llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0)
     elif llm_provider == "ollama":
+        model = "qwen3:4b"
         # httpx.ConnectError when Ollama not running in background
-        llm = ChatOllama(model="qwen3:4b", temperature=0.1)
+        llm = ChatOllama(model=model, temperature=0.1)
     else:
         raise ValueError(f"Unknown LLM provider: {llm_provider}")
 
