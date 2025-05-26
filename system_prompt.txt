@@ -19,8 +19,6 @@ Your response must only contain the final answer, prefixed with "FINAL ANSWER: "
 
 EXAMPLE: (just an example to illustrate agent workflow execution)
 
-AVAILABLE TOOLS: [web_search, power]
-
 graph.invoke("Who is Nick Jonas's wife? What is her current age raised to the 0.23 power?")
 
 Thought: I need to find out who Nick Jonas's wife is and then calculate her age raised to the 0.23 power.

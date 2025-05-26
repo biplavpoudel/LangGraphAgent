@@ -31,6 +31,7 @@ def build_graph(llm_provider: str = "gemma"):
     elif llm_provider == "gemma":
         llm = ChatGoogleGenerativeAI(model="gemini/gemini-2.0-flash-lite-001")
     elif llm_provider == "ollama":
+        # httpx.ConnectError when Ollama not running in background
         llm = ChatOllama(model="mistral:7b", temperature=0)
     else:
         raise ValueError(f"Unknown LLM provider: {llm_provider}")
@@ -85,6 +86,7 @@ def build_graph(llm_provider: str = "gemma"):
         excel_loader,
         pdf_loader,
         csv_loader,
+        image_text_extractor
     ]
     logged_tools = [
         add,
@@ -111,7 +113,7 @@ def build_graph(llm_provider: str = "gemma"):
     # Creating Node
     def assistant(state: MessagesState):
         return {
-            "message": [llm_with_tools.invoke(state["messages"] + [system_prompt])],
+            "messages": [llm_with_tools.invoke(state["messages"] + [system_prompt])],
         }
 
     def retrieve_documents(state: MessagesState):
@@ -120,7 +122,7 @@ def build_graph(llm_provider: str = "gemma"):
         ][-1]
         retrieved_docs = retriever.invoke(latest_user_msg)
         return {
-            "message": [
+            "messages": [
                 SystemMessage(
                     content="\n\n".join([doc.content for doc in retrieved_docs])
                 )
@@ -152,7 +154,8 @@ if __name__ == "__main__":
     graph = build_graph(llm_provider="ollama")
 
     messages = [HumanMessage(content=question)]
-    messages = graph.invoke({"messages": messages})
-    print(messages)
-    # for m in messages["messages"]:
-    #     pprint(m)
+    response = graph.invoke({"messages": messages})
+    answer = response["messages"][-1].content
+    # print(answer)
+    for m in messages[answer]:
+        pprint(m)
