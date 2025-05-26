@@ -1,9 +1,11 @@
 import csv
+from typing import List, Dict
+
 import requests
 import os
 import pytesseract
 import base64
-from typing import Union
+import yt_dlp
 from PIL import Image
 from duckduckgo_search.exceptions import DuckDuckGoSearchException
 from langchain_core.tools import tool
@@ -15,6 +17,8 @@ from langchain_community.document_loaders import PyPDFLoader
 # from langchain_community.utilities import SearxSearchWrapper
 
 from dotenv import load_dotenv
+from yt_dlp import YoutubeDL
+import webvtt
 
 load_dotenv()
 
@@ -266,7 +270,7 @@ def csv_loader(path: str) -> str:
 
 
 @tool("image_text_extractor", parse_docstring=True)
-def image_text_extractor(path: str, model: str = pytesseract) -> str:
+def image_text_extractor(path: str, model: str = "pytesseract") -> str:
     """Returns text from image file using OCR library pytesseract (if available).
 
     Args:
@@ -291,14 +295,92 @@ def image_text_extractor(path: str, model: str = pytesseract) -> str:
                 "stream": False,
             },
         )
-
         result = response.json()["response"]
     print(f"Text from image '{path.split('/')[-1]}' is :\n{result}")
     return result
+
+@tool("youtube_caption_downloader", parse_docstring=True)
+def youtube_caption_downloader(url: str, out_dir:str = "downloads", lang:List=['en'], sub_format:str='vtt') -> List[Dict]:
+    """Alternative to transcribing the audio from YouTube videos.
+    Returns YouTube caption downloaded from given URL.
+
+    Args:
+        url (str): YouTube URL
+        out_dir (Optional): defaults to 'downloads'
+        lang (List): defaults to ['en']
+        sub_format (Optional): defaults to 'vtt'
+    """
+    download_dir = os.getcwd() + f"/{out_dir}/"
+    os.makedirs(download_dir, exist_ok=True)
+    success = False
+    captions_list = []
+    actual_path=""
+    # Arguments for yt-dlp
+    opts = {
+        'writesubtitles': True,
+        'writeautomaticsub': True,
+        'subtitleslangs': lang,
+        'subtitlesformat': sub_format,
+        'skip_download': True,
+        'outtmpl': os.path.join(download_dir, '%(title)s-%(id)s.%(ext)s'),
+        'quiet': True,
+        'warnings': False,
+        'retries': 2
+    }
+    try:
+        with YoutubeDL(opts) as ydl:
+            info_dict = ydl.extract_info(url, download=True)
+            video_title = info_dict.get('title', 'Unknown Title')
+            video_id = info_dict.get('id', 'Unknown ID')
+            print(f"Downloading caption for {video_title}({video_id}) from URL {url}")
+            subtitles = info_dict.get('subtitles', {})
+            auto_captions = info_dict.get('automatic_captions', {})
+            if lang[0] in subtitles:
+                print(f"Manual subtitles found and downloaded for language: {lang[0]}")
+            elif lang[0] in auto_captions:
+                print(f"Automatic subtitles found and downloaded for language: {lang[0]}")
+            else:
+                print(f"No subtitles available for language '{lang[0]}'")
+
+            # Estimate subtitle filename
+            subtitle_filename1 = f"{video_title}-{video_id}.{lang[0]}.vtt"
+            subtitle_filename2 = f"{video_title}-{video_id}.{lang[0]}.srt"
+            subtitle_path1 = os.path.join(download_dir, subtitle_filename1)
+            subtitle_path2 = os.path.join(download_dir, subtitle_filename2)
+
+            if os.path.exists(subtitle_path1):
+                print(f"Subtitle saved at: {subtitle_path1}")
+                actual_path = subtitle_path1
+            elif os.path.exists(subtitle_path2):
+                print(f"Subtitle saved at: {subtitle_path2}")
+                actual_path = subtitle_path2
+            else:
+                print("Subtitle file was not found in the expected path.")
+            success = True
+    except yt_dlp.DownloadError as e:
+        print("Download error:", e)
+    except yt_dlp.SameFileError as e:
+        print("Same file error:", e)
+    except Exception as e:
+        print("Unknown error:", e)
+
+    # Now reading the vtt file and returning it as result string
+    if success:
+        for i, caption in enumerate(webvtt.read(actual_path), 1):
+            caption_dict = {
+                "caption_id": caption.identifier or f"cue_{i}",
+                "caption_start": caption.start,
+                "caption_end": caption.end,
+                "caption_text": caption.text.strip(),
+                "caption_voice": caption.voice or None
+            }
+            captions_list.append(caption_dict)
+    return captions_list
 
 
 if __name__ == "__main__":
     keyword = "Attention is all you need"
     # print(wiki_search.invoke(keyword))
     # print(web_search.invoke(keyword))
-    print(arxiv_search.invoke(keyword))
+    # print(arxiv_search.invoke(keyword))
+    print(youtube_caption_downloader.invoke("https://www.youtube.com/watch?v=1htKBjuUWec"))

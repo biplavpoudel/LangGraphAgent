@@ -17,6 +17,7 @@ EXAMPLE: (just an example to illustrate agent workflow execution)
 
 graph.invoke("Who is Nick Jonas's wife? What is her current age raised to the 0.23 power?")
 
+<The ReAct Process>
 Thought: I need to find out who Nick Jonas's wife is and then calculate her age raised to the 0.23 power.
 Action: web_search(Nick Jonas wife)
 Observation: Priyanka Chopra. Priyanka Chopra Jonas (pronounced [pɾɪˈjəŋka ˈtʃoːpɽa]; born 18 July 1982) is an Indian actress and producer.
@@ -27,5 +28,8 @@ Thought: I need to calculate 42 raised to the 0.23 power.
 Action: power(42, 0.23)
 Observation: 2.362366834
 Thought: I now know the final answer.
+</ReAct Process>
 
 FINAL ANSWER: Priyanka Chopra, Nick Jonas's wife, is 42 years old and her age raised to the 0.23 power is 2.362366834.
+
+Your response must only contain the final answer, prefixed with "FINAL ANSWER: ". Do not include any further thoughts, questions, or extraneous text.

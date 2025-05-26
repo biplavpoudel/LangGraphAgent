@@ -1,13 +1,11 @@
-from pprint import pprint
-from typing import Literal
+import re
 
 from langchain_core.vectorstores import InMemoryVectorStore
 from langgraph.graph import StateGraph, START, MessagesState
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
-from sympy.physics.units import temperature
 
-from tools import add, modulo, divide, multiply, subtract, power, arxiv_search, web_search, wiki_search, file_downloader, excel_loader, csv_loader, pdf_loader, image_text_extractor
+from tools import add, modulo, divide, multiply, subtract, power, arxiv_search, web_search, wiki_search, file_downloader, excel_loader, csv_loader, pdf_loader, image_text_extractor, youtube_caption_downloader
 from langchain_huggingface import HuggingFaceEmbeddings
 # from langchain_qdrant import QdrantVectorStore
 # from qdrant_client import QdrantClient
@@ -94,6 +92,7 @@ def build_graph(llm_provider: str = "gemma"):
         pdf_loader,
         csv_loader,
         image_text_extractor,
+        youtube_caption_downloader
     ]
     logged_tools = [
         add,
@@ -110,8 +109,8 @@ def build_graph(llm_provider: str = "gemma"):
         pdf_loader_logged,
         csv_loader_logged,
         image_text_extractor,
+        youtube_caption_downloader
     ]
-    print("Binding tools with the LLM....")
     llm_with_tools = llm.bind_tools(tools)
 
     graph_builder = StateGraph(MessagesState)
@@ -175,6 +174,8 @@ if __name__ == "__main__":
     messages = [HumanMessage(content=question)]
     response = graph.invoke({"messages": messages})
     answer = response["messages"][-1].content
-    print(answer)
+    pattern = r"<think>(.*?)</think>"
+    cleaned_answer = re.sub(pattern=pattern, repl="", string=answer, flags=re.DOTALL)
+    print(cleaned_answer[16:])
     # for m in response["messages"]:
     #     pprint(m)

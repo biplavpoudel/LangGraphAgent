@@ -22,3 +22,5 @@ duckduckgo_search~=6.3.5
 pytesseract~=0.3.13
 matplotlib~=3.10.3
 huggingface-hub~=0.31.2
+yt-dlp~=2025.5.22
+webvtt-py~=0.5.1
