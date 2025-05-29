@@ -1,11 +1,13 @@
 import re
 
+import httpx
+from langchain_openai import ChatOpenAI
 from langchain_core.vectorstores import InMemoryVectorStore
 from langgraph.graph import StateGraph, START, MessagesState
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 
-from tools import add, modulo, divide, multiply, subtract, power, arxiv_search, web_search, wiki_search, file_downloader, excel_loader, csv_loader, pdf_loader, image_text_extractor, youtube_caption_downloader
+from tools import add, modulo, divide, multiply, subtract, power, string_reverse, arxiv_search, web_search, wiki_search, chess_positions, file_downloader, excel_loader, csv_loader, pdf_loader, image_analyzer, youtube_caption_downloader, audio_transcriber, youtube_audio_downloader, save_to_file, read_code
 from langchain_huggingface import HuggingFaceEmbeddings
 # from langchain_qdrant import QdrantVectorStore
 # from qdrant_client import QdrantClient
@@ -31,13 +33,35 @@ def build_graph(llm_provider: str = "gemma"):
             ),
             verbose=True,
         )
+    elif llm_provider == "openai" :
+        llm = ChatOpenAI(
+            model="gpt-4o",
+            temperature=0,
+            max_retries=3,
+            timeout=60
+        )
     elif llm_provider == "gemma":
-        llm = ChatGoogleGenerativeAI(model="gemini/gemini-2.0-flash-lite-001", temperature=0.1)
+        llm = ChatGoogleGenerativeAI(
+            model="gemini/gemini-2.0-flash-lite-001", temperature=0.1
+        )
         # llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0)
     elif llm_provider == "ollama":
-        model = "qwen3:4b"
-        # httpx.ConnectError when Ollama not running in background
-        llm = ChatOllama(model=model, temperature=0.1)
+        try:
+            # model = "qwen3:4b"
+            model = "qwen3:8b"
+            # httpx.ConnectError when Ollama not running in background
+            llm = ChatOllama(
+                model=model,
+                temperature=0.6,
+                repeat_penalty=1,
+                top_k=20,
+                top_p=0.95,
+                stop=["<|im_start|>", "<|im_end|>"],
+            )
+        except httpx.ConnectError as e:
+            print(f"Ollama not running in background: {e}")
+        except Exception as e:
+            print(f"Ollama not working: {e}")
     else:
         raise ValueError(f"Unknown LLM provider: {llm_provider}")
 
@@ -83,16 +107,22 @@ def build_graph(llm_provider: str = "gemma"):
         multiply,
         divide,
         modulo,
+        string_reverse,
         arxiv_search,
         web_search,
         wiki_search,
         power,
+        chess_positions,
         file_downloader,
+        save_to_file,
+        read_code,
         excel_loader,
         pdf_loader,
         csv_loader,
-        image_text_extractor,
-        youtube_caption_downloader
+        # image_analyzer,
+        youtube_audio_downloader,
+        # youtube_caption_downloader,
+        audio_transcriber,
     ]
     logged_tools = [
         add,
@@ -101,6 +131,7 @@ def build_graph(llm_provider: str = "gemma"):
         divide,
         modulo,
         power,
+        string_reverse,
         arxiv_search_logged,
         web_search_logged,
         wiki_search_logged,
@@ -108,8 +139,11 @@ def build_graph(llm_provider: str = "gemma"):
         excel_loader_logged,
         pdf_loader_logged,
         csv_loader_logged,
-        image_text_extractor,
-        youtube_caption_downloader
+        image_analyzer,
+        audio_transcriber,
+        youtube_audio_downloader,
+        # youtube_caption_downloader,
+        chess_positions,
     ]
     llm_with_tools = llm.bind_tools(tools)
 
@@ -118,18 +152,17 @@ def build_graph(llm_provider: str = "gemma"):
 
     # Creating Node
     def assistant(state: MessagesState):
-        # all_messages_for_llm = [system_prompt] + state["messages"]
-        # response_message = llm_with_tools.invoke(all_messages_for_llm)
-        # print(f"\nDEBUG: LLM Raw Response Type: {type(response_message)}")
-        # print(f"DEBUG: LLM Raw Response Content: {response_message.content}")
-        # if isinstance(response_message, AIMessage) and response_message.tool_calls:
-        #     print(f"DEBUG: LLM identified tool calls: {response_message.tool_calls}")
-        # else:
-        #     print("DEBUG: LLM did NOT identify tool calls.")
+        response_message = llm_with_tools.invoke(state["messages"] + [system_prompt])
+        print(f"\nDEBUG: LLM Raw Response Type: {type(response_message)}")
+        print(f"DEBUG: LLM Raw Response Content: {response_message.content}")
+        if isinstance(response_message, AIMessage) and response_message.tool_calls:
+            print(f"DEBUG: LLM identified tool calls: {response_message.tool_calls}")
+        else:
+            print("DEBUG: LLM did NOT identify tool calls.")
         # return {"messages": [response_message]}
 
         return {
-            "messages": [llm_with_tools.invoke(state["messages"] + [system_prompt])],
+            "messages": [response_message],
         }
 
     def retrieve_documents(state: MessagesState):
@@ -168,14 +201,27 @@ def build_graph(llm_provider: str = "gemma"):
 if __name__ == "__main__":
     # question = "When was a picture of St. Thomas Aquinas first added to the Wikipedia page on the Principle of double effect?"
     # question = "Search Wikipedia for 'Python programming language'"
-    question = "What is 200 power 8.99999?"
-    graph = build_graph(llm_provider="ollama")
+    # question = "What is 200 power 8.99999?"
+    # question = ".rewsna eht sa 'tfel' drow eht fo etisoppo eht etirw ,ecnetnes siht dnatsrednu uoy fI"
+    api_url = "https://agents-course-unit4-scoring.hf.space"
+    # url = api_url + "/files/" + "cca530fc-4052-43b2-b130-b30968d8aa44"
+    # question = f"Review the chess position provided in the image. It is black's turn. Provide the correct next move for black which guarantees a win. Please provide your response in algebraic notation. Attached filename is: 'cca530fc-4052-43b2-b130-b30968d8aa44.png' and url is: {url} "
+    # question = "Given this table defining * on the set S = {a, b, c, d, e}\n\n|*|a|b|c|d|e|\n|---|---|---|---|---|---|\n|a|a|b|c|b|d|\n|b|b|c|a|e|c|\n|c|c|a|b|b|a|\n|d|b|e|b|e|d|\n|e|d|b|a|d|c|\n\nprovide the subset of S involved in any possible counter-examples that prove * is not commutative. Provide your answer as a comma separated list of the elements in the set in alphabetical order."
+    # question = "Examine the video at https://www.youtube.com/watch?v=1htKBjuUWec.\n\nWhat does Teal\'c say in response to the question : Isn\'t that hot?"
+    question = "Who are the pitchers with the number before and after Taishō Tamai's number as of July 2023? Give them to me in the form Pitcher Before, Pitcher After, use their last names only, in Roman characters."
+    graph = build_graph(llm_provider="openai")
 
     messages = [HumanMessage(content=question)]
     response = graph.invoke({"messages": messages})
     answer = response["messages"][-1].content
     pattern = r"<think>(.*?)</think>"
-    cleaned_answer = re.sub(pattern=pattern, repl="", string=answer, flags=re.DOTALL)
-    print(cleaned_answer[16:])
+    print(f"DEBUG: Agent is returning response from the graph: {answer}\n")
+    answer = re.sub(
+        pattern=pattern, repl="", string=answer, flags=re.DOTALL
+    )
+    # Strip everything before 'FINAL ANSWER:'
+    cleaned_answer = re.sub(r".*?FINAL ANSWER:\s*", "", answer, flags=re.DOTALL)
+    print(f"DEBUG: Cleaned answer is: {cleaned_answer}\n\n\n\n\n")
+    print(cleaned_answer)
     # for m in response["messages"]:
     #     pprint(m)

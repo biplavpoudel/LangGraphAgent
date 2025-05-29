@@ -21,24 +21,27 @@ class BasicAgent:
 
     def __init__(self):
         print("BasicAgent initialized.")
-        self.graph = build_graph(llm_provider="ollama")
+        self.graph = build_graph(llm_provider="openai")
 
     def __call__(self, question: str) -> str:
-        print(f"Agent received question (first 50 chars): {question[:50]}...")
+        print(f"\nAgent received question (first 50 chars): {question}")
         messages = [HumanMessage(content=question)]
-        response = self.graph.invoke({"message": messages})
+        response = self.graph.invoke({"messages": messages})
         answer = response["messages"][-1].content
-        print(f"Agent is returning response from the graph: {answer}")
         pattern = r"<think>(.*?)</think>"
-        cleaned_answer = re.sub(pattern=pattern, repl="", string=answer, flags=re.DOTALL)
-        return cleaned_answer[16:]
+        print(f"DEBUG: Agent is returning response from the graph: {answer}\n")
+        answer = re.sub(
+            pattern=pattern, repl="", string=answer, flags=re.DOTALL
+        )
+        # Strip everything before 'FINAL ANSWER:'
+        cleaned_answer = re.sub(r".*?FINAL ANSWER:\s*", "", answer, flags=re.DOTALL)
+        print(f"DEBUG: Cleaned answer is: {cleaned_answer}\n\n\n\n\n")
+        return cleaned_answer
 
 
 def run_and_submit_all(profile: gr.OAuthProfile | None):
-    """
-    Fetches all questions, runs the BasicAgent on them, submits all answers,
-    and displays the results.
-    """
+    """Fetches all questions, runs the BasicAgent on them, submits all answers,
+    and displays the results."""
     # --- Determine HF Space Runtime URL and Repo URL ---
     space_id = os.getenv("SPACE_ID")  # Get the SPACE_ID for sending link to the code
 
@@ -91,11 +94,19 @@ def run_and_submit_all(profile: gr.OAuthProfile | None):
     for item in questions_data:
         task_id = item.get("task_id")
         question_text = item.get("question")
+        file_name = item.get("file_name")
         if not task_id or question_text is None:
             print(f"Skipping item with missing task_id or question: {item}")
             continue
         try:
-            submitted_answer = agent(question_text)
+            if file_name:
+                file_url = api_url + "/files/" + task_id
+                submitted_answer = agent(
+                    question_text
+                    + f" Attached file is: {file_name}. Url is: {file_url}"
+                )
+            else:
+                submitted_answer = agent(question_text)
             answers_payload.append(
                 {"task_id": task_id, "submitted_answer": submitted_answer}
             )
@@ -117,7 +128,7 @@ def run_and_submit_all(profile: gr.OAuthProfile | None):
             )
 
     if not answers_payload:
-        print("Agent did not produce any answers to submit.")
+        print("Agent did not produce any answers to submit.\n")
         return "Agent did not produce any answers to submit.", pd.DataFrame(results_log)
 
     # 4. Prepare Submission
@@ -130,47 +141,47 @@ def run_and_submit_all(profile: gr.OAuthProfile | None):
     print(status_update)
 
     # 5. Submit
-    # print(f"Submitting {len(answers_payload)} answers to: {submit_url}")
-    # try:
-    #     response = requests.post(submit_url, json=submission_data, timeout=60)
-    #     response.raise_for_status()
-    #     result_data = response.json()
-    #     final_status = (
-    #         f"Submission Successful!\n"
-    #         f"User: {result_data.get('username')}\n"
-    #         f"Overall Score: {result_data.get('score', 'N/A')}% "
-    #         f"({result_data.get('correct_count', '?')}/{result_data.get('total_attempted', '?')} correct)\n"
-    #         f"Message: {result_data.get('message', 'No message received.')}"
-    #     )
-    #     print("Submission successful.")
-    #     results_df = pd.DataFrame(results_log)
-    #     return final_status, results_df
-    # except requests.exceptions.HTTPError as e:
-    #     error_detail = f"Server responded with status {e.response.status_code}."
-    #     try:
-    #         error_json = e.response.json()
-    #         error_detail += f" Detail: {error_json.get('detail', e.response.text)}"
-    #     except requests.exceptions.JSONDecodeError:
-    #         error_detail += f" Response: {e.response.text[:500]}"
-    #     status_message = f"Submission Failed: {error_detail}"
-    #     print(status_message)
-    #     results_df = pd.DataFrame(results_log)
-    #     return status_message, results_df
-    # except requests.exceptions.Timeout:
-    #     status_message = "Submission Failed: The request timed out."
-    #     print(status_message)
-    #     results_df = pd.DataFrame(results_log)
-    #     return status_message, results_df
-    # except requests.exceptions.RequestException as e:
-    #     status_message = f"Submission Failed: Network error - {e}"
-    #     print(status_message)
-    #     results_df = pd.DataFrame(results_log)
-    #     return status_message, results_df
-    # except Exception as e:
-    #     status_message = f"An unexpected error occurred during submission: {e}"
-    #     print(status_message)
-    #     results_df = pd.DataFrame(results_log)
-    #     return status_message, results_df
+    print(f"Submitting {len(answers_payload)} answers to: {submit_url}")
+    try:
+        response = requests.post(submit_url, json=submission_data, timeout=60)
+        response.raise_for_status()
+        result_data = response.json()
+        final_status = (
+            f"Submission Successful!\n"
+            f"User: {result_data.get('username')}\n"
+            f"Overall Score: {result_data.get('score', 'N/A')}% "
+            f"({result_data.get('correct_count', '?')}/{result_data.get('total_attempted', '?')} correct)\n"
+            f"Message: {result_data.get('message', 'No message received.')}"
+        )
+        print("Submission successful.")
+        results_df = pd.DataFrame(results_log)
+        return final_status, results_df
+    except requests.exceptions.HTTPError as e:
+        error_detail = f"Server responded with status {e.response.status_code}."
+        try:
+            error_json = e.response.json()
+            error_detail += f" Detail: {error_json.get('detail', e.response.text)}"
+        except requests.exceptions.JSONDecodeError:
+            error_detail += f" Response: {e.response.text[:500]}"
+        status_message = f"Submission Failed: {error_detail}"
+        print(status_message)
+        results_df = pd.DataFrame(results_log)
+        return status_message, results_df
+    except requests.exceptions.Timeout:
+        status_message = "Submission Failed: The request timed out."
+        print(status_message)
+        results_df = pd.DataFrame(results_log)
+        return status_message, results_df
+    except requests.exceptions.RequestException as e:
+        status_message = f"Submission Failed: Network error - {e}"
+        print(status_message)
+        results_df = pd.DataFrame(results_log)
+        return status_message, results_df
+    except Exception as e:
+        status_message = f"An unexpected error occurred during submission: {e}"
+        print(status_message)
+        results_df = pd.DataFrame(results_log)
+        return status_message, results_df
 
 
 # --- Build Gradio Interface using Blocks ---

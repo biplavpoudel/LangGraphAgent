@@ -13,14 +13,14 @@ class ToolLogger:
 
     def wrap(self, tool_fn):
         name = tool_fn.name
+        """Tools in Langchain with @tool decorator take input as
+        dictionary/json.
 
-        """
-        Tools in Langchain with @tool decorator take input as dictionary/json.
         i.e.
             @tool("add_tool", parse_docstring=True)
             def add(a: int, b: int) -> int:
             return a + b
-        To invoke this add_tool, we call: 
+        To invoke this add_tool, we call:
             sum = add.invoke({"a": 1, "b": 2})
         """
 

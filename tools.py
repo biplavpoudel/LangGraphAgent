@@ -1,11 +1,14 @@
 import csv
-from typing import List, Dict
+import tempfile
+from typing import List, Dict, Optional
+import gc
 
 import requests
 import os
 import pytesseract
 import base64
 import yt_dlp
+import whisper
 from PIL import Image
 from duckduckgo_search.exceptions import DuckDuckGoSearchException
 from langchain_core.tools import tool
@@ -14,6 +17,7 @@ from duckduckgo_search import DDGS
 from langchain_community.document_loaders import WikipediaLoader, ArxivLoader
 from langchain_community.document_loaders import UnstructuredExcelLoader
 from langchain_community.document_loaders import PyPDFLoader
+from chessimg2pos import predict_fen
 # from langchain_community.utilities import SearxSearchWrapper
 
 from dotenv import load_dotenv
@@ -89,6 +93,16 @@ def power(a: float, b: float) -> float | complex:
     return pow(a, b)
 
 
+@tool("string_reverse", parse_docstring=True)
+def string_reverse(string: str) -> str:
+    """Reverses the given string query.
+
+    Args:
+        string: Query string to be reversed
+    """
+    return string[::-1]
+
+
 @tool("web_search", parse_docstring=False)
 def web_search(query: str) -> str:
     """Search the keyword in Search Engine.
@@ -97,7 +111,7 @@ def web_search(query: str) -> str:
         query (str): String to search for
     """
     try:
-        results = DDGS().text(keywords=query, max_results=2)
+        results = DDGS().text(keywords=query, max_results=4)
         formatted_result = f"\n\n{'-' * 50}\n\n".join(
             [
                 f"<Document Source = '{page['href']}', Title = '{page['title']}'>\n {page['body']}"
@@ -111,12 +125,13 @@ def web_search(query: str) -> str:
         )
 
     try:
-        search_tool = TavilySearch(max_results=2, topic="general")
-        result = search_tool.invoke(f'"query":"{query}"')["results"]
+        search_tool = TavilySearch(max_results=5, topic="general")
+        result = search_tool.invoke({"query": query})
+        pages = result.get("results", [])
         formatted_result = f"\n\n{'-' * 50}\n\n".join(
             [
                 f"<Document Source = '{page['url']}', Title = '{page['title']}'>\n {page['content']}"
-                for page in result
+                for page in pages
             ]
         )
         return formatted_result
@@ -131,9 +146,10 @@ def wiki_search(name: str) -> str:
     """Search the keyword in Wikipedia.
 
     Args:
-        name (str): String to lookup in Wikipedia."""
+        name (str): String to lookup in Wikipedia.
+    """
     wikipedia_result = WikipediaLoader(
-        query=name, load_max_docs=2, load_all_available_meta=True
+        query=name, load_max_docs=3, load_all_available_meta=True
     ).load()
     formatted_result = f"\n\n{'-' * 50}\n\n".join(
         [
@@ -144,14 +160,15 @@ def wiki_search(name: str) -> str:
     return str(formatted_result)
 
 
-@tool("arxiv_search", parse_docstring=False)
+@tool("arxiv_search", parse_docstring=True)
 def arxiv_search(name: str) -> str:
-    """Search the paper in arXiv.org
+    """Search the paper in arXiv.org.
 
     Args:
-        name (str): Name of paper to lookup in arXiv.org"""
+        name (str): Name of paper to lookup in arXiv.org
+    """
     arxiv_result = ArxivLoader(
-        query=name, load_max_docs=2, load_all_available_meta=True
+        query=name, load_max_docs=3, load_all_available_meta=True
     ).load()
     formatted_result = f"\n\n{'-' * 50}\n\n".join(
         [
@@ -163,16 +180,15 @@ def arxiv_search(name: str) -> str:
 
 
 @tool("file_downloader", parse_docstring=False)
-def file_downloader(url: str) -> str:
+def file_downloader(url: str, file_name: str = None) -> str:
     """Downloads file from the input url.
-
     Args:
         url (str): URL of the resource to download.
+        file_name (str): Name of file to download.
 
     Returns:
-        (str) : The path of the downloaded file.
-    """
-    filename = url.split("/")[-1]
+        (str) : The path of the downloaded file."""
+    filename = file_name if file_name else url.split("/")[-1]
     download_dir = os.getcwd() + "/downloads/"
     os.makedirs(download_dir, exist_ok=True)
     file_path = os.path.join(download_dir, filename)
@@ -215,12 +231,58 @@ def file_downloader(url: str) -> str:
     return file_path
 
 
+@tool("read_code", parse_docstring=True)
+def read_code(filepath: str) -> str:
+    """Reads a programming language file such as Python, C, Java, etc.  and
+    returns it as a string.
+
+    Args:
+        filepath (str): the path of the code file.
+    """
+    code = ""
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            code = f.read()
+    except FileNotFoundError:
+        print(f"Error: File not found at '{filepath}'.")
+        return None
+    except IOError as e:
+        print(f"Error reading file '{filepath}': {e}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred while processing '{filepath}': {e}")
+
+    return f"The code is returned as string: {code}."
+
+
+@tool("save_to_file", parse_docstring=True)
+def save_to_file(content: str, filename: Optional[str] = None) -> str:
+    """Saves content to a file and returns the path.
+
+    Args:
+        content (str): the content to save to the file
+        filename (str, optional): the name of the file. If not provided, a random filename will be created.
+    """
+    download_dir = os.getcwd() + "/downloads/"
+    if filename is None:
+        temp_file = tempfile.NamedTemporaryFile(delete=False, dir=download_dir)
+        filepath = temp_file.name
+    else:
+        filepath = os.path.join(download_dir, filename)
+
+    with open(filepath, "w") as f:
+        f.write(content)
+
+    return f"File saved to following directory: {filepath}."
+
+
 @tool("excel_loader", parse_docstring=True)
 def excel_loader(path: str) -> str:
     """Returns Excel file as formatted string.
 
     Args:
-        path (str): Path to Excel file"""
+        path (str): Path to Excel file
+    """
     loader = UnstructuredExcelLoader(file_path=path, mode="elements")
     docs = loader.load()
     formatted_result = f"\n\n{'-' * 50}\n\n".join(
@@ -237,7 +299,8 @@ def pdf_loader(path: str) -> str:
     """Returns pdf file as formatted string.
 
     Args:
-        path (str): Path to pdf file"""
+        path (str): Path to pdf file
+    """
     loader = PyPDFLoader(file_path=path, mode="single")
     docs = loader.load()
     formatted_result = f"\n\n{'-' * 50}\n\n".join(
@@ -254,7 +317,8 @@ def csv_loader(path: str) -> str:
     """Returns pdf file as formatted string.
 
     Args:
-        path (str): Path to csv file"""
+        path (str): Path to csv file
+    """
     docs = []
     formatted_result = ""
     with open(path, newline="", encoding="utf-8") as csvfile:
@@ -269,40 +333,139 @@ def csv_loader(path: str) -> str:
     return str(formatted_result)
 
 
-@tool("image_text_extractor", parse_docstring=True)
-def image_text_extractor(path: str, model: str = "pytesseract") -> str:
-    """Returns text from image file using OCR library pytesseract (if available).
+@tool("image_analyzer", parse_docstring=True)
+def image_analyzer(path: str, model: str = "ollama") -> str:
+    """Analyzes image and returns text from image file.
 
     Args:
         path (str): Path to image file
-        model (Optional): defaults to PyTesseract. For local use with Ollama, Gemma3 can be used
+        model (str): 'ollama' (default) or 'pytesseract'
     """
-    result = ""
-    if model == "pytesseract":
-        result = pytesseract.image_to_string(Image.open(path), output_type="string")
-    elif model == "ollama":
+
+    if not os.path.exists(path):
+        print(f"Error: Image file not found at '{path}'.")
+        return None
+
+    if model == "ollama":
         with open(path, "rb") as img_file:
             img_base64 = base64.b64encode(img_file.read()).decode("utf-8")
-
         # Send to Ollama
         response = requests.post(
             "http://localhost:11434/api/generate",
             json={
                 "model": "gemma3:4b-it-q8_0",
                 "options": {"temperature": 1, "top_p": 0.95, "top_k": 64},
-                "prompt": "What is in this image?",
+                "prompt": "Analyze the image properly and state what you found.",
                 "images": [img_base64],
                 "stream": False,
             },
         )
         result = response.json()["response"]
+    elif model == "pytesseract":
+        result = pytesseract.image_to_string(Image.open(path), output_type="string")
+
     print(f"Text from image '{path.split('/')[-1]}' is :\n{result}")
     return result
 
+
+@tool("chess_positions", parse_docstring=True)
+def chess_positions(path: str) -> str:
+    """Returns FEN(Forsyth-Edwards Notation) positions of each chess pieces
+    based on image provided. If the LLM is capable of Vision-related tasks,
+    this tool will act as supplementary tool.
+
+    Args:
+        path (str): Path to chessboard image file.
+    """
+    result = predict_fen("downloads/cca530fc-4052-43b2-b130-b30968d8aa44.png")
+    return result
+
+
+@tool("audio_transcriber", parse_docstring=True)
+def audio_transcriber(path: str, model: str = "whisper") -> str:
+    """Returns audio transcript from given file.
+
+    Args:
+        path (str): Path to audio file
+        model (Optional): Defaults to whisper by OpenAI with turbo model
+    """
+    result = ""
+    try:
+        if os.path.exists(path) and path.endswith(".mp3"):
+            model = whisper.load_model("turbo")
+            result = model.transcribe(model=model, audio=path)
+            del model
+            gc.collect()
+            print(f"The audio transcript from the file {path} is: {result['text']}")
+    except Exception as e:
+        result = f"Couldn't transcribe the audio file: {str(e)}"
+    return result
+
+
+@tool("youtube_audio_downloader", parse_docstring=True)
+def youtube_audio_downloader(
+    url: str, out_dir: str = "downloads", audio_format: str = "mp3"
+) -> str:
+    """
+    Downloads YouTube audio from given URL and returns path to downloaded file.
+    Can be used for transcribing with another tool: audio_transcriber.
+    Use it when the question doesn't need watching the YouTube video, just listening to audio and understanding the dialogue is enough.
+    Not good when the task is to analyze each frame of video one-by-one.
+
+    Alternative to: $ yt-dlp -x --audio-format mp3 -o "%(title)s-[%(id)s].%(ext)s" url
+
+    Args:
+        url (str): YouTube URL
+        out_dir (str, Optional): defaults to 'downloads'
+        audio_format (str, Optional): defaults to 'mp3'
+    """
+    download_dir = os.getcwd() + f"/{out_dir}/"
+    os.makedirs(download_dir, exist_ok=True)
+    # Arguments for yt-dlp
+    opts = {
+        "format": "bestaudio/best",
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": audio_format,
+                "preferredquality": "192",  # You can modify this
+            }
+        ],
+        "outtmpl": os.path.join(download_dir, "%(title)s-%(id)s.%(ext)s"),
+        "quiet": True,
+        "warnings": False,
+        "retries": 2,
+    }
+    try:
+        with YoutubeDL(opts) as ydl:
+            info_dict = ydl.extract_info(url, download=True)
+            video_title = info_dict.get("title", "Unknown Title")
+            video_id = info_dict.get("id", "Unknown ID")
+            print(f"Downloading audio for {video_title} ({video_id}) from URL {url}")
+            expected_filename = os.path.join(
+                download_dir, f"{video_title}-{video_id}.{audio_format}"
+            )
+
+            if os.path.exists(expected_filename):
+                print(f"Audio saved at: {expected_filename}")
+            else:
+                print("Audio file was not found in the expected path.")
+        return expected_filename
+    except yt_dlp.DownloadError as e:
+        print("Download error:", e)
+    except yt_dlp.SameFileError as e:
+        print("Same file error:", e)
+    except Exception as e:
+        print("Unknown error:", e)
+    return f"Error downloading audio: {e}"
+
+
 @tool("youtube_caption_downloader", parse_docstring=True)
-def youtube_caption_downloader(url: str, out_dir:str = "downloads", lang:List=['en'], sub_format:str='vtt') -> List[Dict]:
-    """Alternative to transcribing the audio from YouTube videos.
-    Returns YouTube caption downloaded from given URL.
+def youtube_caption_downloader(
+    url: str, out_dir: str = "downloads", lang: List = ["en"], sub_format: str = "vtt"
+) -> List[Dict]:
+    """Alternative to transcribing the audio from YouTube videos. Returns
+    YouTube caption downloaded from given URL.
 
     Args:
         url (str): YouTube URL
@@ -314,31 +477,33 @@ def youtube_caption_downloader(url: str, out_dir:str = "downloads", lang:List=['
     os.makedirs(download_dir, exist_ok=True)
     success = False
     captions_list = []
-    actual_path=""
+    actual_path = ""
     # Arguments for yt-dlp
     opts = {
-        'writesubtitles': True,
-        'writeautomaticsub': True,
-        'subtitleslangs': lang,
-        'subtitlesformat': sub_format,
-        'skip_download': True,
-        'outtmpl': os.path.join(download_dir, '%(title)s-%(id)s.%(ext)s'),
-        'quiet': True,
-        'warnings': False,
-        'retries': 2
+        "writesubtitles": True,
+        "writeautomaticsub": True,
+        "subtitleslangs": lang,
+        "subtitlesformat": sub_format,
+        "skip_download": True,
+        "outtmpl": os.path.join(download_dir, "%(title)s-%(id)s.%(ext)s"),
+        "quiet": True,
+        "warnings": False,
+        "retries": 2,
     }
     try:
         with YoutubeDL(opts) as ydl:
             info_dict = ydl.extract_info(url, download=True)
-            video_title = info_dict.get('title', 'Unknown Title')
-            video_id = info_dict.get('id', 'Unknown ID')
+            video_title = info_dict.get("title", "Unknown Title")
+            video_id = info_dict.get("id", "Unknown ID")
             print(f"Downloading caption for {video_title}({video_id}) from URL {url}")
-            subtitles = info_dict.get('subtitles', {})
-            auto_captions = info_dict.get('automatic_captions', {})
+            subtitles = info_dict.get("subtitles", {})
+            auto_captions = info_dict.get("automatic_captions", {})
             if lang[0] in subtitles:
                 print(f"Manual subtitles found and downloaded for language: {lang[0]}")
             elif lang[0] in auto_captions:
-                print(f"Automatic subtitles found and downloaded for language: {lang[0]}")
+                print(
+                    f"Automatic subtitles found and downloaded for language: {lang[0]}"
+                )
             else:
                 print(f"No subtitles available for language '{lang[0]}'")
 
@@ -365,22 +530,33 @@ def youtube_caption_downloader(url: str, out_dir:str = "downloads", lang:List=['
         print("Unknown error:", e)
 
     # Now reading the vtt file and returning it as result string
-    if success:
+    # can be srt too, need another module pysrt (implement later)
+    if success and actual_path[-3:] == "vtt":
         for i, caption in enumerate(webvtt.read(actual_path), 1):
             caption_dict = {
                 "caption_id": caption.identifier or f"cue_{i}",
                 "caption_start": caption.start,
                 "caption_end": caption.end,
                 "caption_text": caption.text.strip(),
-                "caption_voice": caption.voice or None
+                "caption_voice": caption.voice or None,
             }
             captions_list.append(caption_dict)
+    elif not success:
+        captions_list = [{"caption_id": f"Couldn't download caption: {str(e)}"}]
     return captions_list
 
 
 if __name__ == "__main__":
     keyword = "Attention is all you need"
     # print(wiki_search.invoke(keyword))
-    # print(web_search.invoke(keyword))
+    print(web_search.invoke(keyword))
     # print(arxiv_search.invoke(keyword))
-    print(youtube_caption_downloader.invoke("https://www.youtube.com/watch?v=1htKBjuUWec"))
+    # # print(
+    # #     youtube_caption_downloader.invoke("https://www.youtube.com/watch?v=1htKBjuUWec")
+    # # )
+    # # query = ".rewsna eht sa 'tfel' drow eht fo etisoppo eht etirw ,ecnetnes siht dnatsrednu uoy fI"
+    # # print(string_reverse.invoke(query))
+    # api_url = "https://agents-course-unit4-scoring.hf.space"
+    # url = api_url + "/files/" + "7bd855d8-463d-4ed5-93ca-5fe35145f733"
+    # file_name = "7bd855d8-463d-4ed5-93ca-5fe35145f733.xlsx"
+    # print(file_downloader.invoke({"url": url, "file_name": file_name}))

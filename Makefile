@@ -8,5 +8,8 @@ lint:
 format:
 	pyink *.py
 
+docformatter:
+	docformatter --in-place tools.py
+
 all:
 	install lint format
