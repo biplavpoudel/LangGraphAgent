@@ -32,5 +32,6 @@ jobs:
         env:
           HF: ${{ secrets.HF }}
         run: |
+          git config lfs.allowincompletepush true
           git lfs push --all space
           git push --force space main
